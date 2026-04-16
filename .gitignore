@@ -1,0 +1,6 @@
+.venv/
+.venv-x64/
+__pycache__/
+*.pyc
+desktop.ini
+.gradio/
