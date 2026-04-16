@@ -126,7 +126,7 @@ I tested the app with normal inputs, invalid inputs, and edge cases to verify th
 - Screenshots of successful and unsuccessful runs are included in the Demo section.
 
 ## Hugging Face Link
-(To be added later)
+https://huggingface.co/spaces/flatworshipper/cisc121-shuttle-stop-merge-sort
 
 ## Author & AI Acknowledgment
 **Author:** Antony Li
