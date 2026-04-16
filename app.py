@@ -169,6 +169,88 @@ def build_ranked_output(sorted_stops):
 
     return "\n".join(lines)
 
+def build_visual_ranking_html(sorted_stops):
+    """
+    Creates an HTML visualization of the ranked shuttle stops.
+    """
+    if len(sorted_stops) == 0:
+        return "<p style='color: #e5e7eb;'>No shuttle stops to display.</p>"
+
+    max_crowd = max(stop["crowd_count"] for stop in sorted_stops)
+    cards = []
+
+    for index, stop in enumerate(sorted_stops, start=1):
+        crowd = stop["crowd_count"]
+        width_percent = 0 if max_crowd == 0 else int((crowd / max_crowd) * 100)
+
+        if index == 1:
+            badge = "🚍 Dispatch here first"
+            border_color = "#2563eb"
+            bg_color = "#eff6ff"
+            shadow_color = "rgba(37, 99, 235, 0.18)"
+        else:
+            badge = f"Rank #{index}"
+            border_color = "#c7d2fe"
+            bg_color = "#eef2ff"
+            shadow_color = "rgba(99, 102, 241, 0.10)"
+
+        card_html = f"""
+        <div style="
+            border: 2px solid {border_color};
+            background: {bg_color};
+            border-radius: 14px;
+            padding: 14px;
+            margin-bottom: 12px;
+            box-shadow: 0 4px 12px {shadow_color};
+            color: #111827;
+        ">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <div style="font-weight: 700; font-size: 17px; color: #111827;">
+                    {index}. {stop["stop_name"]}
+                </div>
+                <div style="
+                    font-size: 13px;
+                    font-weight: 600;
+                    padding: 6px 10px;
+                    border-radius: 999px;
+                    background: #e0e7ff;
+                    color: #3730a3;
+                ">
+                    {badge}
+                </div>
+            </div>
+
+            <div style="margin-bottom: 8px; font-size: 14px; color: #374151;">
+                Crowd Count: <b style="color: #111827;">{crowd}</b>
+            </div>
+
+            <div style="
+                width: 100%;
+                height: 14px;
+                background: #dbeafe;
+                border-radius: 999px;
+                overflow: hidden;
+            ">
+                <div style="
+                    width: {width_percent}%;
+                    height: 14px;
+                    background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+                    border-radius: 999px;
+                    transition: width 0.4s ease;
+                "></div>
+            </div>
+        </div>
+        """
+
+        cards.append(card_html)
+
+    return """
+    <div style="margin-top: 8px;">
+        <h3 style="margin-bottom: 12px; color: #f9fafb;">Visual Ranking</h3>
+        {}
+    </div>
+    """.format("".join(cards))
+
 
 def process_shuttle_data(raw_text):
     """
@@ -177,6 +259,7 @@ def process_shuttle_data(raw_text):
     - original formatted list
     - final ranked list
     - step-by-step sorting log
+    - visual ranking HTML
     """
     stops = parse_shuttle_stops(raw_text)
     steps = []
@@ -186,8 +269,9 @@ def process_shuttle_data(raw_text):
     original_output = build_original_output(stops)
     ranked_output = build_ranked_output(sorted_stops)
     steps_output = "\n".join(steps)
+    visual_output = build_visual_ranking_html(sorted_stops)
 
-    return original_output, ranked_output, steps_output
+    return original_output, ranked_output, steps_output, visual_output
 
 
 def run_app(raw_text):
@@ -196,11 +280,60 @@ def run_app(raw_text):
     It catches validation errors and returns user-friendly output.
     """
     try:
-        original_output, ranked_output, steps_output = process_shuttle_data(raw_text)
-
-        return original_output, ranked_output, steps_output
+        original_output, ranked_output, steps_output, visual_output = process_shuttle_data(raw_text)
+        return original_output, ranked_output, steps_output, visual_output
     except ValueError as error:
-        return f"Error: {error}", "", ""
+        return f"Error: {error}", "", "", ""
+
+
+load_sound_js = """
+function attachSortSound() {
+    const btn = document.querySelector("#sort-btn button") || document.querySelector("#sort-btn");
+    if (!btn || btn.dataset.soundBound === "1") return;
+
+    btn.dataset.soundBound = "1";
+
+    btn.addEventListener("click", () => {
+        try {
+            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+            if (!AudioContextClass) return;
+
+            const ctx = new AudioContextClass();
+
+            const playTone = () => {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+
+                osc.type = "triangle";
+                osc.frequency.setValueAtTime(880, ctx.currentTime);
+
+                gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.12, ctx.currentTime + 0.01);
+                gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.12);
+
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+
+                osc.start();
+                osc.stop(ctx.currentTime + 0.12);
+            };
+
+            if (ctx.state === "suspended") {
+                ctx.resume().then(playTone);
+            } else {
+                playTone();
+            }
+        } catch (e) {
+            console.log("Sound unavailable:", e);
+        }
+    });
+}
+
+attachSortSound();
+setTimeout(attachSortSound, 400);
+setTimeout(attachSortSound, 1200);
+"""
+
 
 if __name__ == "__main__":
     sample_input = """ARC, 52
@@ -208,63 +341,140 @@ Douglas Library, 18
 Victoria Hall, 39
 Stauffer Library, 27"""
 
+    custom_css = """
+    .gradio-container {
+        max-width: 1100px !important;
+    }
+
+    .hero {
+        padding: 22px;
+        border-radius: 18px;
+        margin-bottom: 14px;
+        background: linear-gradient(135deg, #1d4ed8 0%, #7c3aed 100%);
+        color: white;
+        box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
+    }
+
+    .hero h1 {
+        margin: 0 0 8px 0;
+        font-size: 2rem;
+    }
+
+    .hero p {
+        margin: 0;
+        font-size: 1rem;
+        opacity: 0.95;
+    }
+
+    .info-card {
+        padding: 16px;
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .result-box textarea {
+        border-radius: 14px !important;
+        animation: fadeUp 0.35s ease;
+    }
+
+    @keyframes fadeUp {
+        from {
+            opacity: 0;
+            transform: translateY(8px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    """
+
     with gr.Blocks() as demo:
-        gr.Markdown("# Shuttle Stop Crowd Ranking with Merge Sort")
-        gr.Markdown(
+        gr.HTML(
             """
-            Enter shuttle stops one per line using this format:
-
-            `stop_name, crowd_count`
-
-            Example:
-            ```
-            ARC, 52
-            Douglas Library, 18
-            Victoria Hall, 39
-            Stauffer Library, 27
-            ```
-
-            The app sorts the stops from highest crowd count to lowest using Merge Sort
-            and shows the major steps of the sorting process.
+            <div class="hero">
+                <h1> Antony's Shuttle Stop Crowd Ranking with Merge Sort</h1>
+                <p>
+                    Enter shuttle stops, sort them from highest crowd count to lowest,
+                    and view the Merge Sort process in a more visual way.
+                </p>
+            </div>
             """
-        )
-
-        input_box = gr.Textbox(
-            lines=10,
-            label="Shuttle Stop Input",
-            placeholder="One stop per line: stop_name, crowd_count",
-            value=sample_input
         )
 
         with gr.Row():
-            sort_button = gr.Button("Sort Shuttle Stops")
-            clear_button = gr.Button("Clear")
+            with gr.Column(scale=3):
+                input_box = gr.Textbox(
+                    lines=10,
+                    label="Shuttle Stop Input",
+                    placeholder="One stop per line: stop_name, crowd_count",
+                    value=sample_input
+                )
 
-        original_output_box = gr.Textbox(
-            label="Original Shuttle Stop List",
-            lines=8
-        )
+                with gr.Row():
+                    sort_button = gr.Button(
+                        "Sort Shuttle Stops",
+                        variant="primary",
+                        size="lg",
+                        elem_id="sort-btn"
+                    )
+                    clear_button = gr.Button("Clear", variant="secondary", size="lg")
 
-        ranked_output_box = gr.Textbox(
-            label="Final Ranked List",
-            lines=8
-        )
+            with gr.Column(scale=2):
+                gr.HTML(
+                    """
+                    <div class="info-card">
+                        <h3>How to Use</h3>
+                        <ul>
+                            <li>Enter one shuttle stop per line.</li>
+                            <li>Use the format <b>stop_name, crowd_count</b>.</li>
+                            <li>Click <b>Sort Shuttle Stops</b>.</li>
+                            <li>Read the ranking, crowd bars, and step log.</li>
+                        </ul>
+                    </div>
+                    """
+                )
 
-        steps_output_box = gr.Textbox(
-            label="Merge Sort Steps",
-            lines=18
-        )
+        with gr.Row():
+            original_output_box = gr.Textbox(
+                label="Original Shuttle Stop List",
+                lines=8,
+                elem_classes="result-box"
+            )
+
+            ranked_output_box = gr.Textbox(
+                label="Final Ranked List",
+                lines=8,
+                elem_classes="result-box"
+            )
+
+        visual_output_box = gr.HTML()
+
+        with gr.Accordion("Show Merge Sort Steps", open=False):
+            steps_output_box = gr.Textbox(
+                label="Merge Sort Steps",
+                lines=18,
+                elem_classes="result-box"
+            )
+
 
         sort_button.click(
             fn=run_app,
             inputs=input_box,
-            outputs=[original_output_box, ranked_output_box, steps_output_box]
+            outputs=[original_output_box, ranked_output_box, steps_output_box, visual_output_box]
         )
 
         clear_button.click(
-            fn=lambda: ("", "", "", ""),
+            fn=lambda: ("", "", "", "", ""),
             inputs=[],
-            outputs=[input_box, original_output_box, ranked_output_box, steps_output_box]
+            outputs=[input_box, original_output_box, ranked_output_box, steps_output_box, visual_output_box]
         )
 
-    demo.launch(inbrowser=True)
+
+    demo.launch(
+        inbrowser=True,
+        theme=gr.themes.Soft(primary_hue="blue", secondary_hue="violet"),
+        css=custom_css,
+        js=load_sound_js
+    )

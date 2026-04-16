@@ -17,6 +17,9 @@ This project uses Merge Sort. Merge Sort fits this problem because it works well
 ### Edge Case Example
 ![Edge case example](screenshots/demo-edge-case.png)
 
+### Visual and Creative Features
+The app includes a visual ranking panel with crowd bars, a highlighted dispatch recommendation for the busiest stop, and a small sound effect when the sort action is triggered. These additions were included to improve visualization, interactivity, and overall presentation while maintaining correct Merge Sort behavior and input validation.
+
 ## Problem Breakdown & Computational Thinking
 
 ### Why this algorithm fits
